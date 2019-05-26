@@ -65,10 +65,42 @@
                                 <label id="price">0 تومان</label>
                                 <input type="hidden" name="price" value="0" />
                             </div>
+                        </div>
+                        <!-- Modal -->
+                        <div class="modal fade" id="purchase_modal" role="dialog">
+                            <div class="modal-dialog">
 
+                                <!-- Modal content-->
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                        <h4 class="modal-title">تایید پرداخت</h4>
+                                    </div>
+                                    <div class="modal-body text-center">
+                                        <div class="form-group">
+                                            <label for="payment_method">پرداخت از طریق</label>
+                                            <div>
+                                                <img src="assets/img/zarinpal_logo.png" id="payment_method" class="img-thumbnail" style="max-width: 120px" alt="درگاه زرین پال">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="price">مبلغ قابل پرداخت</label>
+                                            <div class="text-success">
+                                                <label id="final_price">0 تومان</label>
+                                                <input type="hidden" name="final_price" value="0" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer" style="text-align: right">
+                                        <button type="button" class="btn btn-success">پرداخت</button>
+                                        <button type="button" class="btn btn-default" data-dismiss="modal">بازگشت</button>
+                                    </div>
+                                </div>
+
+                            </div>
                         </div>
                         <div class="row">
-                            <button type="submit" class="btn btn-success col-md-2" style="margin-left:7px">خرید</button>
+                            <button type="button" id="submit" class="btn btn-info col-md-2" style="margin-left:7px">ثبت</button>
                             <button type="reset" class="btn btn-default col-md-2" >پاک کردن</button>
                         </div>
                 </form>
@@ -168,6 +200,18 @@
 
                 $("#price").text( formatNumber( final_price ) + " تومان" );
                 $("input[name='price']").val( final_price  );
+            });
+
+            // Submit button
+            $("#submit").on("click", function () {
+                var final_price = parseInt( $("input[name='price']").val() );
+                if ( final_price > 0 )
+                {
+                    $("#final_price").text( formatNumber( final_price ) + " تومان" );
+                    $("input[name='final_price']").val( final_price  );
+
+                    $('#purchase_modal').modal('show');
+                }
             });
         </script>
 
