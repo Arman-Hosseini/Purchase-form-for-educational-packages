@@ -2,7 +2,116 @@
 	//In the name of god
 	//By: Arman Hosseini
 	require_once( "config.php" );
-	print_R($_POST);
+
+	if ( isset( $_POST["do_purchase"] ) )
+    {
+        $err = null;
+        $err_type = 'danger';
+
+        if ( !isset( $_POST["firstname"] ) || empty( $_POST["firstname"] ) )
+        {
+            $err .= "نام خود را وارد نمایید !" . br;
+        }
+
+        if ( !isset( $_POST["lastname"] ) || empty( $_POST["lastname"] ) )
+        {
+            $err .= "نام خانوادگی خود را وارد نمایید !" . br;
+        }
+
+        if ( !isset( $_POST["email"] ) || empty( $_POST["email"] ) )
+        {
+            $err .= "رایانامه خود را وارد نمایید !" . br;
+        }
+
+        if ( !isset( $_POST["mobile"] ) || empty( $_POST["mobile"] ) )
+        {
+            $err .= "تلفن همراه خود را وارد نمایید !" . br;
+        }
+
+        if ( !isset( $_POST["education_base"] ) )
+        {
+            $err .= "پایه تحصیلی را انتخاب نمایید !" . br;
+        }
+        else
+        {
+            if ( !$education_base[ $_POST["education_base"] ])
+                $err .= "پایه تحصیلی انتخاب شده صحیح نمی باشد!" . br;
+        }
+
+        if ( !isset( $_POST["grade"] ) )
+        {
+            $err .= "مقطع تحصیلی را انتخاب نمایید !" . br;
+        }
+        else
+        {
+            if ( !isset( $education_grade[ $_POST["grade"] ] ) )
+                $err .= "مقطع تحصیلی انتخاب شده صحیح نمی باشد!" . br;
+        }
+
+        if ( !isset( $_POST["plan"] ) )
+        {
+            $err .= "لطفا یکی از طرح ها را انتخاب نمایید !" . br;
+        }
+        else
+        {
+            if ( !isset( $plans[ $_POST["education_base"] ][ $_POST["plan"] ] ) )
+                $err .= "طرح انتخاب شده موجود نمی باشد!" . br;
+        }
+
+        if ( !isset( $_POST["addon"] ) || !is_array( $_POST["addon"] ) )
+        {
+            $err .= "لطفا یکی از افزودنی ها را انتخاب نمایید !" . br;
+        }
+        else
+        {
+            foreach ( $_POST["addon"] as $addon )
+                if ( !array_key_exists( $addon, $addons ) )
+                    $err .= "افزودنی انتخاب شده موجود نمی باشد!" . br;
+        }
+
+        // Check uploaded file when everything is right
+        if ( is_null( $err ) ) {
+            $file_name = "";
+            if (isset($_FILES["select_file"]) && !empty($_FILES["select_file"]["name"])) {
+                $file_name = $_FILES["select_file"]["name"];
+                $sep_dot = explode(".", $file_name);
+                $file_ext = end($sep_dot);
+                if (in_array($file_ext, ["txt", "pdf", "png", "jpg", "jpeg", "JPG"])) {
+                    $file_name = md5(time() . $file_name) . "." . $file_ext;
+                    if (!move_uploaded_file($_FILES["select_file"]["tmp_name"], "assets/img/upload/" . $file_name))
+                        $err .= "مشکلی در پیوست فایل بوجود آمده است!" . br;
+                } else
+                    $err .= "پسوند فایل پیوست شده صحیح نمی باشد!" . br;
+            }
+            /*else //optional
+                $err .= "شما هیچ فایلی برای پیوست انتخاب نکرده اید!" . br;*/
+        }
+
+        // Do this section if everything is right
+        if ( is_null( $err ) )
+        {
+            $err_type = 'success';
+            $err = "ثبت نام موفقیت آمیز بود!";
+
+            $prepare = $conn->prepare("INSERT INTO `purchase_form` 
+        (`id`, `firstname`, `lastname`, `email`, `mobile`, `educationBase`, `educationGrade`, `filePath`, `planId`, `addonIds`)
+        VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $prepare->execute(
+                [
+                    $_POST["firstname"],
+                    $_POST["lastname"],
+                    $_POST["email"],
+                    $_POST["mobile"],
+                    $_POST["education_base"],
+                    $_POST["grade"],
+                    $file_name,
+                    $_POST["plan"],
+                    json_encode($_POST["addon"]),
+
+                ]
+            );
+        }
+    }
 ?>
 <!DOCTYPE html>
 <html dir="rtl">
@@ -18,7 +127,12 @@
             <div class="row center-block">
                 <div class="col-md-6 col-md-offset-3 col-sm-6 col-sm-offset-3 col-xs-10 col-xs-offset-1">
                     <?=$header?>
-                    <form action="" method="post" enctype="multipart/form-data">
+                    <?php if ( isset($err) ): ?>
+                    <div class="alert alert-<?=$err_type?>">
+                        <?=$err?>
+                    </div>
+                    <?php endif ?>
+                    <form action="" method="post" id="purchase_form" enctype="multipart/form-data">
                         <div class="form-group">
                             <label for="firstname">نام <code>*</code></label>
                             <input type="text" class="form-control" id="firstname" name="firstname">
@@ -38,38 +152,36 @@
                         <div class="form-group">
                             <label for="education_base">پایه تحصیلی <code>*</code></label>
                             <select class="form-control" id="education_base" name="education_base">
-                                <option value="1">نهم</option>
-                                <option value="2">دهم</option>
-                                <option value="3">یازدهم</option>
-                                <option value="4">دوازدهم</option>
-                                <option value="5">فارغ التحصیل</option>
+                                <?php foreach( $education_base as $id => $base): ?>
+                                    <option value="<?=$id?>"<?=(($id==0)?' selected':'')?>><?=$base?></option>
+                                <?php endforeach ?>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="select_file">اننتخاب فایل</label>
-                            <input type="file" class="form-control-file" id="select_file">
+                            <input type="file" class="form-control-file" id="select_file" name="select_file">
                         </div>
                         <div class="form-group">
                             <label for="grade">مقطع تحصیلی <code>*</code></label>
-                            <div class="radio">
-                                <label><input type="radio" name="grade" value="1" checked>دبیرستان</label>
-                            </div>
+                            <?php foreach( $education_grade as $id => $grade): ?>
+                                <div class="radio">
+                                    <label><input type="radio" name="grade" value="<?=$id?>"<?=(($id==0)?' checked':'')?>><?=$grade?></label>
+                                </div>
+                            <?php endforeach ?>
                         </div>
 
                         <div class="form-group">
                             <label for="plans">قیمت طرح ها <code>*</code></label>
                             <div id="plans">
-
                             </div>
                         </div>
                         <div class="form-group">
                             <label for="addons">افزودنی ها</label>
-                            <div class="checkbox">
-                                <label><input type="checkbox" name="addon[]" value="700">افزودنی ۱</label>
-                            </div>
-                            <div class="checkbox">
-                                <label><input type="checkbox" name="addon[]" value="500">افزودنی ۲</label>
-                            </div>
+                            <?php foreach( $addons as $id => $addon): ?>
+                                <div class="checkbox">
+                                    <label><input type="checkbox" name="addon[]" price="<?=$addon['price']?>" value="<?=$id?>"><?=$addon['name']?></label>
+                                </div>
+                            <?php endforeach ?>
                         </div>
                         <div class="form-group">
                             <label for="price">مبلغ قابل پرداخت</label>
@@ -104,7 +216,7 @@
                                         </div>
                                     </div>
                                     <div class="modal-footer" style="text-align: right">
-                                        <button type="button" class="btn btn-success">پرداخت</button>
+                                        <button type="submit" class="btn btn-success" name="do_purchase">پرداخت</button>
                                         <button type="button" class="btn btn-default" data-dismiss="modal">بازگشت</button>
                                     </div>
                                 </div>
@@ -125,56 +237,24 @@
                 return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
             }
 
-            var plans_name = [
-                'وی آی پی',
-                'طلایی',
-                'نقره ای',
-                'برنزی'
-            ];
-            var plans = {
-                1: [
-                    900,
-                    700,
-                    600,
-                    500
-                ],
-                2: [
-                    800,
-                    600,
-                    500,
-                    400,
-                ],
-                3: [
-                    700,
-                    500,
-                    400,
-                    300,
-                ],
-                4: [
-                    600,
-                    400,
-                    300,
-                    200,
-                ],
-                5: [
-                    9579000,
-                    300,
-                    200,
-                    100,
-                ],
-            };
+            var plans_name = <?=json_encode($plans_name)?>;
+            var plans = <?=json_encode($plans)?>;
 
             $(function () {
                 // Init plans
                 $("#plans").html('');
-                var i = 1;
-                for( j = 0; j < plans_name.length; j++ )
+                var i = 0; /*education base id*/
+                for( j = 0;/*plan id*/ j < plans_name.length; j++ )
                     $("#plans").append(
                         '<div class="radio">\n' +
-                        '<label><input type="radio" name="plan" value="'+plans[i][j]+'">'+plans_name[j]+' - '+formatNumber(plans[i][j])+' تومان </label>\n' +
+                        '<label><input type="radio" name="plan" price="'+plans[i][j]+'" value="'+j+'">'+plans_name[j]+' - '+formatNumber(plans[i][j])+' تومان </label>\n' +
                         '</div>'
                     );
 
+                // Purchase submit
+                $("#purchase_form").submit(function () {
+
+                });
             });
 
             // Diffrent prices for each education base
@@ -184,17 +264,17 @@
                 for( j = 0; j < plans_name.length; j++ )
                     $("#plans").append(
                         '<div class="radio">\n' +
-                        '<label><input type="radio" name="plan" value="'+plans[i][j]+'">'+plans_name[j]+' - '+formatNumber(plans[i][j])+' تومان </label>\n' +
+                        '<label><input type="radio" name="plan" price="'+plans[i][j]+'" value="'+j+'">'+plans_name[j]+' - '+formatNumber(plans[i][j])+' تومان </label>\n' +
                         '</div>'
                     );
             });
 
             // Calculate final price
             $('body').on("click", "input[name='plan']", function () {
-                var plan_price = $(this).val();
+                var plan_price = $(this).attr("price");
                 var addons_price = 0;
                 $("input[name='addon[]']:checked:enabled").each(function() {
-                    addons_price += parseInt( $(this).val() );
+                    addons_price += parseInt( $(this).attr("price") );
                 });
                 var final_price = parseInt(plan_price) + addons_price;
 
@@ -202,7 +282,7 @@
                 $("input[name='price']").val( final_price  );
             });
             $('input[name="addon[]"]').change( function () {
-                var addon_price = parseInt( $(this).val() );
+                var addon_price = parseInt( $(this).attr("price") );
                 var final_price = parseInt( $("input[name='price']").val() );
 
                 if ( $(this).prop("checked") )
