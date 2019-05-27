@@ -20,23 +20,23 @@
                     <?=$header?>
                     <form action="" method="post" enctype="multipart/form-data">
                         <div class="form-group">
-                            <label for="firstname">نام </label>
+                            <label for="firstname">نام <code>*</code></label>
                             <input type="text" class="form-control" id="firstname" name="firstname">
                         </div>
                         <div class="form-group">
-                            <label for="lastname">نام خانوادگی </label>
+                            <label for="lastname">نام خانوادگی <code>*</code></label>
                             <input type="text" class="form-control" id="lastname" name="lastname">
                         </div>
                         <div class="form-group">
-                            <label for="email">رایانامه </label>
+                            <label for="email">رایانامه <code>*</code></label>
                             <input type="email" class="form-control" id="email" name="email">
                         </div>
                         <div class="form-group">
-                            <label for="mobile">تلفن همراه </label>
+                            <label for="mobile">تلفن همراه <code>*</code></label>
                             <input type="text" class="form-control" id="mobile" name="mobile">
                         </div>
                         <div class="form-group">
-                            <label for="education_base">پایه تحصیلی</label>
+                            <label for="education_base">پایه تحصیلی <code>*</code></label>
                             <select class="form-control" id="education_base" name="education_base">
                                 <option value="1">نهم</option>
                                 <option value="2">دهم</option>
@@ -50,14 +50,14 @@
                             <input type="file" class="form-control-file" id="select_file">
                         </div>
                         <div class="form-group">
-                            <label for="grade">مقطع تحصیلی</label>
+                            <label for="grade">مقطع تحصیلی <code>*</code></label>
                             <div class="radio">
                                 <label><input type="radio" name="grade" value="1" checked>دبیرستان</label>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="plans">قیمت طرح ها</label>
+                            <label for="plans">قیمت طرح ها <code>*</code></label>
                             <div id="plans">
 
                             </div>
