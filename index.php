@@ -18,7 +18,7 @@
             <div class="row center-block">
                 <div class="col-md-6 col-md-offset-3 col-sm-6 col-sm-offset-3 col-xs-10 col-xs-offset-1">
                     <?=$header?>
-                    <form action="" method="post">
+                    <form action="" method="post" enctype="multipart/form-data">
                         <div class="form-group">
                             <label for="firstname">نام </label>
                             <input type="text" class="form-control" id="firstname" name="firstname">
@@ -26,6 +26,14 @@
                         <div class="form-group">
                             <label for="lastname">نام خانوادگی </label>
                             <input type="text" class="form-control" id="lastname" name="lastname">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">رایانامه </label>
+                            <input type="email" class="form-control" id="email" name="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="mobile">تلفن همراه </label>
+                            <input type="text" class="form-control" id="mobile" name="mobile">
                         </div>
                         <div class="form-group">
                             <label for="education_base">پایه تحصیلی</label>
@@ -36,6 +44,10 @@
                                 <option value="4">دوازدهم</option>
                                 <option value="5">فارغ التحصیل</option>
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="select_file">اننتخاب فایل</label>
+                            <input type="file" class="form-control-file" id="select_file">
                         </div>
                         <div class="form-group">
                             <label for="grade">مقطع تحصیلی</label>
