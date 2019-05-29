@@ -1,12 +1,16 @@
 <?php
 	//In the name of god
 	//By: Arman Hosseini
+
+    // Import config
 	require_once( "config.php" );
 
+    // Do Purchase
 	if ( isset( $_POST["do_purchase"] ) )
     {
         $err = null;
         $err_type = 'danger';
+        $amount = 0;
 
         if ( !isset( $_POST["firstname"] ) || empty( $_POST["firstname"] ) )
         {
@@ -56,6 +60,8 @@
         {
             if ( !isset( $plans[ $_POST["education_base"] ][ $_POST["plan"] ] ) )
                 $err .= "طرح انتخاب شده موجود نمی باشد!" . br;
+            else
+                $amount += $plans[ $_POST["education_base"] ][ $_POST["plan"] ];
         }
 
         if ( !isset( $_POST["addon"] ) || !is_array( $_POST["addon"] ) )
@@ -67,15 +73,20 @@
             foreach ( $_POST["addon"] as $addon )
                 if ( !array_key_exists( $addon, $addons ) )
                     $err .= "افزودنی انتخاب شده موجود نمی باشد!" . br;
+                else
+                    $amount += $addons[ $addon ]["price"];
         }
 
         // Check uploaded file when everything is right
-        if ( is_null( $err ) ) {
+        if ( is_null( $err ) )
+        {
             $file_name = "";
-            if (isset($_FILES["select_file"]) && !empty($_FILES["select_file"]["name"])) {
+            if (isset($_FILES["select_file"]) && !empty($_FILES["select_file"]["name"]))
+            {
                 $file_name = $_FILES["select_file"]["name"];
                 $sep_dot = explode(".", $file_name);
                 $file_ext = end($sep_dot);
+
                 if (in_array($file_ext, ["txt", "pdf", "png", "jpg", "jpeg", "JPG"])) {
                     $file_name = md5(time() . $file_name) . "." . $file_ext;
                     if (!move_uploaded_file($_FILES["select_file"]["tmp_name"], "assets/img/upload/" . $file_name))
@@ -91,25 +102,181 @@
         if ( is_null( $err ) )
         {
             $err_type = 'success';
-            $err = "ثبت نام موفقیت آمیز بود!";
+            //$err = "ثبت نام موفقیت آمیز بود!";
 
-            $prepare = $conn->prepare("INSERT INTO `purchase_form` 
-        (`id`, `firstname`, `lastname`, `email`, `mobile`, `educationBase`, `educationGrade`, `filePath`, `planId`, `addonIds`)
-        VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $prepare->execute(
-                [
-                    $_POST["firstname"],
-                    $_POST["lastname"],
-                    $_POST["email"],
-                    $_POST["mobile"],
-                    $_POST["education_base"],
-                    $_POST["grade"],
-                    $file_name,
-                    $_POST["plan"],
-                    json_encode($_POST["addon"]),
 
-                ]
+            // start payment with ZARINPAL GATEWAY //
+            $data = array(
+                'MerchantID'  => $ZarinPal_MerchantID,
+                'Amount'      => $amount,
+                'CallbackURL' => $ZarinPal_CallbackURL,
+                'Description' => $ZarinPal_Description
             );
+            $jsonData = json_encode($data);
+            $ch = curl_init($ZarinPal_PaymentRequestUrl);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v1');
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type: application/json',
+                'Content-Length: ' . strlen($jsonData)
+            ));
+
+            $result = curl_exec($ch);
+            $re = json_decode(
+                $result,
+                true
+            );print_r(curl_error($ch));
+            if ( isset( $re["Status"] ) && $re["Status"] == 100 )
+            {
+                $out = [ "ok" => true ];
+                if ( isset( $re["Authority"] ) )
+                {
+                    $query = $conn->query( "INSERT INTO purchase_transaction 
+VALUES( NULL, '".rand( 10000000, 99999999 )."', '".$amount."', '".$re["Authority"]."', NOW(), 0 )" );
+                    $prepare = $conn->prepare("INSERT INTO `purchase_form` 
+        (`id`, `firstname`, `lastname`, `email`, `mobile`, `educationBase`, `educationGrade`, `filePath`, `planId`, `addonIds`, `purchaseId`)
+        VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?, '".$conn->lastInsertId()."')");
+                    $prepare->execute(
+                        [
+                            $_POST["firstname"],
+                            $_POST["lastname"],
+                            $_POST["email"],
+                            $_POST["mobile"],
+                            $_POST["education_base"],
+                            $_POST["grade"],
+                            $file_name,
+                            $_POST["plan"],
+                            json_encode($_POST["addon"]),
+
+                        ]
+                    );
+
+                    // Redirect user to gateway
+                    $out["payment_url"] = $ZarinPal_StartPaymentUrl . $re["Authority"];
+                    header( "Location: " . $out["payment_url"] );
+                    exit();
+                }
+            }
+            ////////////////////////////////////////
+
+        }
+    }
+
+	// Payment Callback
+    if ( isset( $_GET["Authority"] ) && isset( $_GET["Status"] ) )
+    {
+        if ( $_GET["Status"] == "OK" ) {
+            $Authority = $_GET["Authority"];
+            $query = $conn->prepare("SELECT id, amount, trackingCode FROM purchase_transaction WHERE authority = ? AND status = 0");
+            $query->execute(
+                array($Authority)
+            );
+
+            if ($query->rowCount() == 1) {
+                // Fetching purchase transaction information
+                $purt         = $query->fetch(PDO::FETCH_ASSOC);
+                $purchaseId   = $purt["id"];
+                $amount       = $purt["amount"];
+                $trackingCode = $purt["trackingCode"];
+
+                // start payment with ZARINPAL GATEWAY //
+                $data = array(
+                        'MerchantID' => $ZarinPal_MerchantID,
+                        'Amount'     => $amount,
+                        'Authority'  => $Authority
+                );
+                $jsonData = json_encode($data);
+                $ch = curl_init($ZarinPal_PaymentVerificationUrl);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v1');
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                    'Content-Type: application/json',
+                    'Content-Length: ' . strlen($jsonData)
+                ));
+
+                $result = curl_exec($ch);
+                $re = json_decode(
+                    $result,
+                    true
+                );
+
+                // Payment is successful
+                if (isset($re["Status"]) && $re["Status"] == 100)
+                {
+                    // Update purchase transaction status to successful
+                    $query = $conn->query("UPDATE purchase_transaction SET status = 1 WHERE authority = " . $Authority );
+
+                    // Fetching user information
+                    $query = $conn->query("SELECT * FROM purchase_form WHERE purchaseId = " . $purchaseId );
+                    $user = $query->fetch(PDO::FETCH_ASSOC);
+
+                    // Send E-Mail
+                    $to      = 'any-email@mail.com';
+                    $subject = 'New registration';
+                    $message =
+                        "---Registration Email---" . PHP_EOL .
+                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
+                        "Email: " . $user["email"] . PHP_EOL .
+                        "Mobile: " . $user["mobile"] . PHP_EOL .
+                        "Plan Name: " . $plans_name[ $user["planId"] ] . "-" . $plans[ $user["educationBase"] ][ $user["planId"] ] . " Tooman" . PHP_EOL .
+                        "Tracking Code: " . $trackingCode . PHP_EOL
+                    ;
+                    $headers = 'From: no-reply@yoursite.com' . "\r\n" .
+                        'Reply-To: ' . $to . "\r\n" .
+                        'X-Mailer: PHP/' . phpversion();
+                    mail($to, $subject, $message, $headers);
+
+                    // Send SMS to admin
+                    $SMS_data = [
+                            "Username" => $SMS_Username,
+                            "Password" => $SMS_Password,
+                            "From"     => $SMS_FromNumber,
+                            "To"       => $SMS_AdminNumber,
+                    ];
+                    $SMS_data["Text"]  =
+                        "---Admin SMS---"  . PHP_EOL .
+                        "New registration" . PHP_EOL .
+                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
+                        "Email: " . $user["email"] . PHP_EOL .
+                        "Mobile: " . $user["mobile"] . PHP_EOL
+                    ;
+                    file_get_contents( $SMS_URL ."?" . http_build_query( $SMS_data ) );
+
+                    // Send SMS to user
+                    $SMS_data["To"]    = $user["mobile"];
+                    $SMS_data["Text"]  =
+                        "---User SMS---"  . PHP_EOL .
+                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
+                        "Plan Name: " . $plans_name[ $user["planId"] ] . "-" . $plans[ $user["educationBase"] ][ $user["planId"] ] . " Tooman" . PHP_EOL .
+                        "Tracking Code: " . $trackingCode . PHP_EOL
+                    ;
+                    file_get_contents( $SMS_URL . "?" . http_build_query( $SMS_data ) );
+
+
+                    // Message
+                    $err_type = "success";
+                    $err =
+                        "<h4>" . "پرداخت شما با موفقیت انجام شد!" . "</h4>" . br .
+                        "<strong>" . "کد پیگیری: " . "<abbr>" . $trackingCode . "</abbr>" . "</strong>";
+                } else {
+                    // Message
+                    $err_type = "danger";
+                    $err =
+                        "<h4>" . " متاسفانه پرداخت شما موفقیت آمیز نبود!" . "</h4>";
+                }
+            }
+        }
+        else
+        {
+            // Message
+            $err_type = "danger";
+            $err =
+                "<h4>" . " متاسفانه پرداخت شما موفقیت آمیز نبود!" . "</h4>"
+            ;
         }
     }
 ?>
@@ -252,9 +419,9 @@
                     );
 
                 // Purchase submit
-                $("#purchase_form").submit(function () {
+                /*$("#purchase_form").submit(function () {
 
-                });
+                });*/
             });
 
             // Diffrent prices for each education base

@@ -5,7 +5,13 @@
  */
 
 // Database Config
-require_once( "db.php" );
+require_once( "db_cfg.php" );
+
+// Payment Config
+require_once( "payment_cfg.php" );
+
+// SMS Config
+require_once( "sms_cfg.php" );
 
 try {
     $conn = new PDO("mysql:host=$servername;dbname=".$dbname.";charset=utf8", $username, $password);
