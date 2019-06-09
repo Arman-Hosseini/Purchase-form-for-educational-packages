@@ -5,13 +5,13 @@
  */
 
 // Database Config
-require_once( "db_cfg.php" );
+require_once( "inc/db_cfg.php" );
 
 // Payment Config
-require_once( "payment_cfg.php" );
+require_once( "inc/payment_cfg.php" );
 
 // SMS Config
-require_once( "sms_cfg.php" );
+require_once( "inc/sms_cfg.php" );
 
 try {
     $conn = new PDO("mysql:host=$servername;dbname=".$dbname.";charset=utf8", $username, $password);
@@ -25,7 +25,7 @@ catch(PDOException $e)
 //
 
 // Init fields
-require_once( "init.php" );
+require_once( "inc/init.php" );
 
 // Set head
 $head   = '
