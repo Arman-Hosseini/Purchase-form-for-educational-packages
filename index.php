@@ -106,38 +106,79 @@
 
 
             // start payment with ZARINPAL GATEWAY //
-            $data = array(
-                'MerchantID'  => $ZarinPal_MerchantID,
-                'Amount'      => $amount,
-                'CallbackURL' => $ZarinPal_CallbackURL,
-                'Description' => $ZarinPal_Description
-            );
-            $jsonData = json_encode($data);
-            $ch = curl_init($ZarinPal_PaymentRequestUrl);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v1');
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                'Content-Type: application/json',
-                'Content-Length: ' . strlen($jsonData)
-            ));
-
-            $result = curl_exec($ch);
-            $re = json_decode(
-                $result,
-                true
-            );print_r(curl_error($ch));
-            if ( isset( $re["Status"] ) && $re["Status"] == 100 )
+            if ( $ZarinPal_Status )
             {
-                $out = [ "ok" => true ];
-                if ( isset( $re["Authority"] ) )
+                $data = array(
+                    'MerchantID' => $ZarinPal_MerchantID,
+                    'Amount' => $amount,
+                    'CallbackURL' => $ZarinPal_CallbackURL,
+                    'Description' => $ZarinPal_Description
+                );
+                $jsonData = json_encode($data);
+                $ch = curl_init($ZarinPal_PaymentRequestUrl);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v1');
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                    'Content-Type: application/json',
+                    'Content-Length: ' . strlen($jsonData)
+                ));
+
+                $result = curl_exec($ch);
+                $re = json_decode(
+                    $result,
+                    true
+                ); // print_r(curl_error($ch));print_R($re);
+                if (isset($re["Status"]) && $re["Status"] == 100)
                 {
-                    $query = $conn->query( "INSERT INTO purchase_transaction 
-VALUES( NULL, '".rand( 10000000, 99999999 )."', '".$amount."', '".$re["Authority"]."', NOW(), 0 )" );
+                    $out = ["ok" => true];
+                    if (isset($re["Authority"]))
+                    {
+                        $query = $conn->query("INSERT INTO purchase_transaction 
+VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $re["Authority"] . "', NOW(), 0 )");
+                        $prepare = $conn->prepare("INSERT INTO `purchase_form` 
+        (`id`, `firstname`, `lastname`, `email`, `mobile`, `educationBase`, `educationGrade`, `filePath`, `planId`, `addonIds`, `purchaseId`)
+        VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?, '" . $conn->lastInsertId() . "')");
+                        $prepare->execute(
+                            [
+                                $_POST["firstname"],
+                                $_POST["lastname"],
+                                $_POST["email"],
+                                $_POST["mobile"],
+                                $_POST["education_base"],
+                                $_POST["grade"],
+                                $file_name,
+                                $_POST["plan"],
+                                json_encode($_POST["addon"]),
+
+                            ]
+                        );
+
+                        // Redirect user to gateway
+                        $out["payment_url"] = $ZarinPal_StartPaymentUrl . $re["Authority"];
+                        header("Location: " . $out["payment_url"]);
+                        exit();
+                    }
+                }
+            }
+            ////////////////////////////////////////
+
+
+            // start payment with PAY.IR GATEWAY //
+            if ( $PayIr_Status )
+            {
+                $cost = $amount * 10; // IRR
+                $mobile = $_POST["mobile"];
+                $result = payir_send($PayIr_Api, $cost, $PayIr_CallbackURL, $mobile, $PayIr_FactorNumber, $PayIr_Description);
+                $result = json_decode($result);
+                if ($result->status)
+                {
+                    $query = $conn->query("INSERT INTO purchase_transaction 
+VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $result->token . "', NOW(), 0 )");
                     $prepare = $conn->prepare("INSERT INTO `purchase_form` 
         (`id`, `firstname`, `lastname`, `email`, `mobile`, `educationBase`, `educationGrade`, `filePath`, `planId`, `addonIds`, `purchaseId`)
-        VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?, '".$conn->lastInsertId()."')");
+        VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?, '" . $conn->lastInsertId() . "')");
                     $prepare->execute(
                         [
                             $_POST["firstname"],
@@ -154,27 +195,32 @@ VALUES( NULL, '".rand( 10000000, 99999999 )."', '".$amount."', '".$re["Authority
                     );
 
                     // Redirect user to gateway
-                    $out["payment_url"] = $ZarinPal_StartPaymentUrl . $re["Authority"];
-                    header( "Location: " . $out["payment_url"] );
+                    $go = $PayIr_Url . $result->token;
+                    header("Location:" . $go);
                     exit();
+                }
+                else {
+                    echo $result->errorMessage;
                 }
             }
             ////////////////////////////////////////
-
         }
     }
 
 	// Payment Callback
+    // Zarinpal gateway
     if ( isset( $_GET["Authority"] ) && isset( $_GET["Status"] ) )
     {
-        if ( $_GET["Status"] == "OK" ) {
+        if ( $_GET["Status"] == "OK" )
+        {
             $Authority = $_GET["Authority"];
             $query = $conn->prepare("SELECT id, amount, trackingCode FROM purchase_transaction WHERE authority = ? AND status = 0");
             $query->execute(
                 array($Authority)
             );
 
-            if ($query->rowCount() == 1) {
+            if ($query->rowCount() == 1)
+            {
                 // Fetching purchase transaction information
                 $purt         = $query->fetch(PDO::FETCH_ASSOC);
                 $purchaseId   = $purt["id"];
@@ -208,7 +254,7 @@ VALUES( NULL, '".rand( 10000000, 99999999 )."', '".$amount."', '".$re["Authority
                 if (isset($re["Status"]) && $re["Status"] == 100)
                 {
                     // Update purchase transaction status to successful
-                    $query = $conn->query("UPDATE purchase_transaction SET status = 1 WHERE authority = " . $Authority );
+                    $query = $conn->query("UPDATE purchase_transaction SET status = 1 WHERE authority = '" . $Authority . "'" );
 
                     // Fetching user information
                     $query = $conn->query("SELECT * FROM purchase_form WHERE purchaseId = " . $purchaseId );
@@ -236,6 +282,105 @@ VALUES( NULL, '".rand( 10000000, 99999999 )."', '".$amount."', '".$re["Authority
                             "Password" => $SMS_Password,
                             "From"     => $SMS_FromNumber,
                             "To"       => $SMS_AdminNumber,
+                    ];
+                    $SMS_data["Text"]  =
+                        "---Admin SMS---"  . PHP_EOL .
+                        "New registration" . PHP_EOL .
+                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
+                        "Email: " . $user["email"] . PHP_EOL .
+                        "Mobile: " . $user["mobile"] . PHP_EOL
+                    ;
+                    file_get_contents( $SMS_URL ."?" . http_build_query( $SMS_data ) );
+
+                    // Send SMS to user
+                    $SMS_data["To"]    = $user["mobile"];
+                    $SMS_data["Text"]  =
+                        "---User SMS---"  . PHP_EOL .
+                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
+                        "Plan Name: " . $plans_name[ $user["planId"] ] . "-" . $plans[ $user["educationBase"] ][ $user["planId"] ] . " Tooman" . PHP_EOL .
+                        "Tracking Code: " . $trackingCode . PHP_EOL
+                    ;
+                    file_get_contents( $SMS_URL . "?" . http_build_query( $SMS_data ) );
+
+
+                    // Message
+                    $err_type = "success";
+                    $err =
+                        "<h4>" . "پرداخت شما با موفقیت انجام شد!" . "</h4>" . br .
+                        "<strong>" . "کد پیگیری: " . "<abbr>" . $trackingCode . "</abbr>" . "</strong>";
+                } else {
+                    // Message
+                    $err_type = "danger";
+                    $err =
+                        "<h4>" . " متاسفانه پرداخت شما موفقیت آمیز نبود!" . "</h4>";
+                }
+            }
+        }
+        else
+        {
+            // Message
+            $err_type = "danger";
+            $err =
+                "<h4>" . " متاسفانه پرداخت شما موفقیت آمیز نبود!" . "</h4>"
+            ;
+        }
+    }
+
+    // PayIr gateway
+    if ( isset( $_GET['token'] ) && isset( $_GET["status"] ) )
+    {
+        if ( $_GET["status"] == 1 )
+        {
+            $token = $_GET['token'];
+
+            $query = $conn->prepare("SELECT id, amount, trackingCode FROM purchase_transaction WHERE authority = ? AND status = 0");
+            $query->execute(
+                array($token)
+            );
+
+            if ($query->rowCount() == 1)
+            {
+                // Fetching purchase transaction information
+                $purt         = $query->fetch(PDO::FETCH_ASSOC);
+                $purchaseId   = $purt["id"];
+                $amount       = $purt["amount"];
+                $trackingCode = $purt["trackingCode"];
+
+                // start payment with PAY.IR GATEWAY //
+                $result = json_decode(payir_verify($PayIr_Api, $token));
+
+                // Payment is successful
+                if ( isset($result->status) && $result->status == 1 )
+                {
+                    // Update purchase transaction status to successful
+                    $query = $conn->query("UPDATE purchase_transaction SET status = 1 WHERE authority = '" . $token . "'" );
+
+                    // Fetching user information
+                    $query = $conn->query("SELECT * FROM purchase_form WHERE purchaseId = " . $purchaseId );
+                    $user = $query->fetch(PDO::FETCH_ASSOC);
+
+                    // Send E-Mail
+                    $to      = 'any-email@mail.com';
+                    $subject = 'New registration';
+                    $message =
+                        "---Registration Email---" . PHP_EOL .
+                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
+                        "Email: " . $user["email"] . PHP_EOL .
+                        "Mobile: " . $user["mobile"] . PHP_EOL .
+                        "Plan Name: " . $plans_name[ $user["planId"] ] . "-" . $plans[ $user["educationBase"] ][ $user["planId"] ] . " Tooman" . PHP_EOL .
+                        "Tracking Code: " . $trackingCode . PHP_EOL
+                    ;
+                    $headers = 'From: no-reply@yoursite.com' . "\r\n" .
+                        'Reply-To: ' . $to . "\r\n" .
+                        'X-Mailer: PHP/' . phpversion();
+                    mail($to, $subject, $message, $headers);
+
+                    // Send SMS to admin
+                    $SMS_data = [
+                        "Username" => $SMS_Username,
+                        "Password" => $SMS_Password,
+                        "From"     => $SMS_FromNumber,
+                        "To"       => $SMS_AdminNumber,
                     ];
                     $SMS_data["Text"]  =
                         "---Admin SMS---"  . PHP_EOL .
@@ -371,7 +516,8 @@ VALUES( NULL, '".rand( 10000000, 99999999 )."', '".$amount."', '".$re["Authority
                                         <div class="form-group">
                                             <label for="payment_method">پرداخت از طریق</label>
                                             <div>
-                                                <img src="assets/img/zarinpal_logo.png" id="payment_method" class="img-thumbnail" style="max-width: 120px" alt="درگاه زرین پال">
+                                                <!--<img src="assets/img/zarinpal_logo.png" id="payment_method" class="img-thumbnail" style="max-width: 120px" alt="درگاه زرین پال">-->
+                                                <img src="assets/img/payir_logo.png" id="payment_method" class="img-thumbnail" style="max-width: 120px; background-color: #4073b5" alt="درگاه pay">
                                             </div>
                                         </div>
                                         <div class="form-group">
@@ -417,11 +563,6 @@ VALUES( NULL, '".rand( 10000000, 99999999 )."', '".$amount."', '".$re["Authority
                         '<label><input type="radio" name="plan" price="'+plans[i][j]+'" value="'+j+'">'+plans_name[j]+' - '+formatNumber(plans[i][j])+' تومان </label>\n' +
                         '</div>'
                     );
-
-                // Purchase submit
-                /*$("#purchase_form").submit(function () {
-
-                });*/
             });
 
             // Diffrent prices for each education base
