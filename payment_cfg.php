@@ -5,8 +5,8 @@
  * Mode: [ 'sandbox', 'www' ]
  */
 
-$mode                            = 'www';
-$ZarinPal_MerchantID             = 'YOUR-MERCHANT-ID';
+$mode                            = 'sandbox';
+$ZarinPal_MerchantID             = 'YOUR-MERCHANT-ID-XXXXXXXXXXXXXXXXXXX'; // Should be 36 char
 $ZarinPal_CallbackURL            = dirname("http://" . $_SERVER["HTTP_HOST"] . $_SERVER["SCRIPT_NAME"]) . "/index.php";
 $ZarinPal_Description            = 'خرید پکیج آموزشی';
 
