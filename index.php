@@ -106,7 +106,7 @@
 
 
             // start payment with ZARINPAL GATEWAY //
-            if ( $ZarinPal_Status )
+            if ( $ZarinPal_Status && $_POST["gateway"] == "zarinpal" )
             {
                 $data = array(
                     'MerchantID' => $ZarinPal_MerchantID,
@@ -166,7 +166,7 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $re["A
 
 
             // start payment with PAY.IR GATEWAY //
-            if ( $PayIr_Status )
+            if ( $PayIr_Status && $_POST["gateway"] == "payir" )
             {
                 $cost = $amount * 10; // IRR
                 $mobile = $_POST["mobile"];
@@ -516,8 +516,34 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $resul
                                         <div class="form-group">
                                             <label for="payment_method">پرداخت از طریق</label>
                                             <div>
-                                                <!--<img src="assets/img/zarinpal_logo.png" id="payment_method" class="img-thumbnail" style="max-width: 120px" alt="درگاه زرین پال">-->
-                                                <img src="assets/img/payir_logo.png" id="payment_method" class="img-thumbnail" style="max-width: 120px; background-color: #4073b5" alt="درگاه pay">
+                                                <?php
+                                                $activeGateway = 0;
+                                                if ( isset( $ZarinPal_Status ) && $ZarinPal_Status ):
+                                                    $activeGateway++;
+                                                ?>
+                                                <div>
+                                                    <br />
+                                                    <input type="radio" name="gateway" value="zarinpal">
+                                                    <img src="assets/img/zarinpal_logo.png" id="payment_method" class="img-thumbnail" style="max-width: 120px" alt="درگاه زرین پال">
+                                                </div>
+                                                <?php
+                                                endif;
+                                                if ( isset( $PayIr_Status ) && $PayIr_Status ):
+                                                    $activeGateway++;
+                                                ?>
+                                                <div>
+                                                    <br />
+                                                    <input type="radio" name="gateway" value="payir">
+                                                    <img src="assets/img/payir_logo.png" id="payment_method" class="img-thumbnail" style="max-width: 120px; background-color: #4073b5" alt="درگاه pay">
+                                                </div>
+                                                <?php
+                                                endif;
+                                                if ( !$activeGateway ):
+                                                ?>
+                                                    <label class="text-danger">متاسفانه درحال حاضر درگاه پرداخت فعالی برای خرید موجود نمی باشد!</label>
+                                                <?php
+                                                endif;
+                                                ?>
                                             </div>
                                         </div>
                                         <div class="form-group">
@@ -563,6 +589,26 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $resul
                         '<label><input type="radio" name="plan" price="'+plans[i][j]+'" value="'+j+'">'+plans_name[j]+' - '+formatNumber(plans[i][j])+' تومان </label>\n' +
                         '</div>'
                     );
+            <?php
+                // Disable do purchase button when there are no active gateways
+                if ( !$activeGateway ):
+            ?>
+                $("button[name='do_purchase']").prop("disabled", true);
+            <?php
+                else:
+            ?>
+                $("button[name='do_purchase']").prop("disabled", true);
+                $("input[type='radio'][name='gateway']").change(
+                    function () {
+                        if ( $(this).prop("checked") )
+                            $("button[name='do_purchase']").prop("disabled", false);
+                        else
+                            $("button[name='do_purchase']").prop("disabled", true );
+                    }
+                );
+            <?php
+                endif;
+            ?>
             });
 
             // Diffrent prices for each education base
