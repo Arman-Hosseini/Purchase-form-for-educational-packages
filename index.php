@@ -83,16 +83,22 @@
             $file_name = "";
             if (isset($_FILES["select_file"]) && !empty($_FILES["select_file"]["name"]))
             {
-                $file_name = $_FILES["select_file"]["name"];
-                $sep_dot = explode(".", $file_name);
-                $file_ext = end($sep_dot);
+                $file_size = 5; // 5MB
+                $file_size_byte = $file_size * 1024 * 1024;
+                if ( $_FILES["select_file"]["size"] <= $file_size_byte )
+                {
+                    $file_name = $_FILES["select_file"]["name"];
+                    $sep_dot = explode(".", $file_name);
+                    $file_ext = end($sep_dot);
 
-                if (in_array($file_ext, ["txt", "pdf", "png", "jpg", "jpeg", "JPG"])) {
-                    $file_name = md5(time() . $file_name) . "." . $file_ext;
-                    if (!move_uploaded_file($_FILES["select_file"]["tmp_name"], "assets/img/upload/" . $file_name))
-                        $err .= "مشکلی در پیوست فایل بوجود آمده است!" . br;
+                    if (in_array($file_ext, ["txt", "pdf", "png", "jpg", "jpeg", "JPG"])) {
+                        $file_name = md5(time() . $file_name) . "." . $file_ext;
+                        if (!move_uploaded_file($_FILES["select_file"]["tmp_name"], "assets/img/upload/" . $file_name))
+                            $err .= "مشکلی در پیوست فایل بوجود آمده است!" . br;
+                    } else
+                        $err .= "پسوند فایل پیوست شده صحیح نمی باشد!" . br;
                 } else
-                    $err .= "پسوند فایل پیوست شده صحیح نمی باشد!" . br;
+                    $err .= sprintf("حجم فایل آپلود شده باید کمتر یا مساوی %s مگابایت باشد.", $file_size) . br;
             }
             /*else //optional
                 $err .= "شما هیچ فایلی برای پیوست انتخاب نکرده اید!" . br;*/
