@@ -1,7 +1,7 @@
 <?php
 /**
-	In the name of God
-	Written By: Arman Hosseini
+ * In the name of God
+ * Written By: Arman Hosseini
  */
 
 // Database Config
@@ -12,6 +12,9 @@ require_once( "inc/payment_cfg.php" );
 
 // SMS Config
 require_once( "inc/sms_cfg.php" );
+
+// Functional functions
+require_once( "inc/functional_funcs.php" );
 
 try {
     $conn = new PDO("mysql:host=$servername;dbname=".$dbname.";charset=utf8", $username, $password);

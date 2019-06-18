@@ -1,6 +1,6 @@
 <?php
 // Init database variables
 $servername = "localhost";
-$dbname = "dbname";
+$dbname = "ponisha1";
 $username = "root";
-$password = "";
+$password = "toor";

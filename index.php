@@ -124,29 +124,13 @@
                     $out = ["ok" => true];
                     if (isset($re["Authority"]))
                     {
-                        $query = $conn->query("INSERT INTO purchase_transaction 
-VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $re["Authority"] . "', NOW(), 0 )");
-                        $prepare = $conn->prepare("INSERT INTO `purchase_form` 
-        (`id`, `firstname`, `lastname`, `email`, `mobile`, `educationBase`, `educationGrade`, `filePath`, `planId`, `addonIds`, `purchaseId`)
-        VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?, '" . $conn->lastInsertId() . "')");
-                        $prepare->execute(
-                            [
-                                $_POST["firstname"],
-                                $_POST["lastname"],
-                                $_POST["email"],
-                                $_POST["mobile"],
-                                $_POST["education_base"],
-                                $_POST["grade"],
-                                $file_name,
-                                $_POST["plan"],
-                                json_encode($_POST["addon"]),
-
-                            ]
-                        );
+                        // insert to purchase transaction table
+                        $trackingCode = createTrackingCode();
+                        newPurchaseTransaction($re["Authority"]);
 
                         // Redirect user to gateway
-                        $out["payment_url"] = $GLOBALS["ZarinPal_StartPaymentUrl"] . $re["Authority"];
-                        header("Location: " . $out["payment_url"]);
+                        $go = $GLOBALS["ZarinPal_StartPaymentUrl"] . $re["Authority"];
+                        header("Location: " . $go);
                         exit();
                     }
                 }
@@ -163,25 +147,9 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $re["A
                 $result = json_decode($result);
                 if ($result->status)
                 {
-                    $query = $conn->query("INSERT INTO purchase_transaction 
-VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $result->token . "', NOW(), 0 )");
-                    $prepare = $conn->prepare("INSERT INTO `purchase_form` 
-        (`id`, `firstname`, `lastname`, `email`, `mobile`, `educationBase`, `educationGrade`, `filePath`, `planId`, `addonIds`, `purchaseId`)
-        VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?, '" . $conn->lastInsertId() . "')");
-                    $prepare->execute(
-                        [
-                            $_POST["firstname"],
-                            $_POST["lastname"],
-                            $_POST["email"],
-                            $_POST["mobile"],
-                            $_POST["education_base"],
-                            $_POST["grade"],
-                            $file_name,
-                            $_POST["plan"],
-                            json_encode($_POST["addon"]),
-
-                        ]
-                    );
+                    // insert to purchase transaction table
+                    $trackingCode = createTrackingCode();
+                    newPurchaseTransaction($result->token);
 
                     // Redirect user to gateway
                     $go = $GLOBALS["PayIr_Url"] . $result->token;
@@ -226,55 +194,8 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $resul
                 // Payment is successful
                 if (isset($re["Status"]) && $re["Status"] == 100)
                 {
-                    // Update purchase transaction status to successful
-                    $query = $conn->query("UPDATE purchase_transaction SET status = 1 WHERE authority = '" . $Authority . "'" );
-
-                    // Fetching user information
-                    $query = $conn->query("SELECT * FROM purchase_form WHERE purchaseId = " . $purchaseId );
-                    $user = $query->fetch(PDO::FETCH_ASSOC);
-
-                    // Send E-Mail
-                    $to      = 'any-email@mail.com';
-                    $subject = 'New registration';
-                    $message =
-                        "---Registration Email---" . PHP_EOL .
-                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
-                        "Email: " . $user["email"] . PHP_EOL .
-                        "Mobile: " . $user["mobile"] . PHP_EOL .
-                        "Plan Name: " . $plans_name[ $user["planId"] ] . "-" . $plans[ $user["educationBase"] ][ $user["planId"] ] . " Tooman" . PHP_EOL .
-                        "Tracking Code: " . $trackingCode . PHP_EOL
-                    ;
-                    $headers = 'From: no-reply@yoursite.com' . "\r\n" .
-                        'Reply-To: ' . $to . "\r\n" .
-                        'X-Mailer: PHP/' . phpversion();
-                    mail($to, $subject, $message, $headers);
-
-                    // Send SMS to admin
-                    $SMS_data = [
-                            "Username" => $SMS_Username,
-                            "Password" => $SMS_Password,
-                            "From"     => $SMS_FromNumber,
-                            "To"       => $SMS_AdminNumber,
-                    ];
-                    $SMS_data["Text"]  =
-                        "---Admin SMS---"  . PHP_EOL .
-                        "New registration" . PHP_EOL .
-                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
-                        "Email: " . $user["email"] . PHP_EOL .
-                        "Mobile: " . $user["mobile"] . PHP_EOL
-                    ;
-                    file_get_contents( $SMS_URL ."?" . http_build_query( $SMS_data ) );
-
-                    // Send SMS to user
-                    $SMS_data["To"]    = $user["mobile"];
-                    $SMS_data["Text"]  =
-                        "---User SMS---"  . PHP_EOL .
-                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
-                        "Plan Name: " . $plans_name[ $user["planId"] ] . "-" . $plans[ $user["educationBase"] ][ $user["planId"] ] . " Tooman" . PHP_EOL .
-                        "Tracking Code: " . $trackingCode . PHP_EOL
-                    ;
-                    file_get_contents( $SMS_URL . "?" . http_build_query( $SMS_data ) );
-
+                    $user = successfulPurchase($Authority);
+                    sendNotifications();
 
                     // Message
                     $err_type = "success";
@@ -325,55 +246,8 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $resul
                 // Payment is successful
                 if ( isset($result->status) && $result->status == 1 )
                 {
-                    // Update purchase transaction status to successful
-                    $query = $conn->query("UPDATE purchase_transaction SET status = 1 WHERE authority = '" . $token . "'" );
-
-                    // Fetching user information
-                    $query = $conn->query("SELECT * FROM purchase_form WHERE purchaseId = " . $purchaseId );
-                    $user = $query->fetch(PDO::FETCH_ASSOC);
-
-                    // Send E-Mail
-                    $to      = 'any-email@mail.com';
-                    $subject = 'New registration';
-                    $message =
-                        "---Registration Email---" . PHP_EOL .
-                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
-                        "Email: " . $user["email"] . PHP_EOL .
-                        "Mobile: " . $user["mobile"] . PHP_EOL .
-                        "Plan Name: " . $plans_name[ $user["planId"] ] . "-" . $plans[ $user["educationBase"] ][ $user["planId"] ] . " Tooman" . PHP_EOL .
-                        "Tracking Code: " . $trackingCode . PHP_EOL
-                    ;
-                    $headers = 'From: no-reply@yoursite.com' . "\r\n" .
-                        'Reply-To: ' . $to . "\r\n" .
-                        'X-Mailer: PHP/' . phpversion();
-                    mail($to, $subject, $message, $headers);
-
-                    // Send SMS to admin
-                    $SMS_data = [
-                        "Username" => $SMS_Username,
-                        "Password" => $SMS_Password,
-                        "From"     => $SMS_FromNumber,
-                        "To"       => $SMS_AdminNumber,
-                    ];
-                    $SMS_data["Text"]  =
-                        "---Admin SMS---"  . PHP_EOL .
-                        "New registration" . PHP_EOL .
-                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
-                        "Email: " . $user["email"] . PHP_EOL .
-                        "Mobile: " . $user["mobile"] . PHP_EOL
-                    ;
-                    file_get_contents( $SMS_URL ."?" . http_build_query( $SMS_data ) );
-
-                    // Send SMS to user
-                    $SMS_data["To"]    = $user["mobile"];
-                    $SMS_data["Text"]  =
-                        "---User SMS---"  . PHP_EOL .
-                        "Name: "  . $user["firstname"] . " " . $user["lastname"] . PHP_EOL .
-                        "Plan Name: " . $plans_name[ $user["planId"] ] . "-" . $plans[ $user["educationBase"] ][ $user["planId"] ] . " Tooman" . PHP_EOL .
-                        "Tracking Code: " . $trackingCode . PHP_EOL
-                    ;
-                    file_get_contents( $SMS_URL . "?" . http_build_query( $SMS_data ) );
-
+                    $user = successfulPurchase($token);
+                    sendNotifications();
 
                     // Message
                     $err_type = "success";
