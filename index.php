@@ -114,28 +114,11 @@
             // start payment with ZARINPAL GATEWAY //
             if ( $ZarinPal_Status && $_POST["gateway"] == "zarinpal" )
             {
-                $data = array(
-                    'MerchantID' => $ZarinPal_MerchantID,
-                    'Amount' => $amount,
-                    'CallbackURL' => $ZarinPal_CallbackURL,
-                    'Description' => $ZarinPal_Description
-                );
-                $jsonData = json_encode($data);
-                $ch = curl_init($ZarinPal_PaymentRequestUrl);
-                curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v1');
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                    'Content-Type: application/json',
-                    'Content-Length: ' . strlen($jsonData)
-                ));
-
-                $result = curl_exec($ch);
+                $result = zarinpal_send($ZarinPal_MerchantID, $amount, $ZarinPal_CallbackURL, $ZarinPal_Description);
                 $re = json_decode(
                     $result,
                     true
-                ); // print_r(curl_error($ch));print_R($re);
+                ); // print_R($re);
                 if (isset($re["Status"]) && $re["Status"] == 100)
                 {
                     $out = ["ok" => true];
@@ -162,7 +145,7 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $re["A
                         );
 
                         // Redirect user to gateway
-                        $out["payment_url"] = $ZarinPal_StartPaymentUrl . $re["Authority"];
+                        $out["payment_url"] = $GLOBALS["ZarinPal_StartPaymentUrl"] . $re["Authority"];
                         header("Location: " . $out["payment_url"]);
                         exit();
                     }
@@ -201,7 +184,7 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $resul
                     );
 
                     // Redirect user to gateway
-                    $go = $PayIr_Url . $result->token;
+                    $go = $GLOBALS["PayIr_Url"] . $result->token;
                     header("Location:" . $go);
                     exit();
                 }
@@ -234,23 +217,7 @@ VALUES( NULL, '" . rand(10000000, 99999999) . "', '" . $amount . "', '" . $resul
                 $trackingCode = $purt["trackingCode"];
 
                 // start payment with ZARINPAL GATEWAY //
-                $data = array(
-                        'MerchantID' => $ZarinPal_MerchantID,
-                        'Amount'     => $amount,
-                        'Authority'  => $Authority
-                );
-                $jsonData = json_encode($data);
-                $ch = curl_init($ZarinPal_PaymentVerificationUrl);
-                curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v1');
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                    'Content-Type: application/json',
-                    'Content-Length: ' . strlen($jsonData)
-                ));
-
-                $result = curl_exec($ch);
+                $result = zarinpal_verify($ZarinPal_MerchantID, $amount, $Authority);
                 $re = json_decode(
                     $result,
                     true
