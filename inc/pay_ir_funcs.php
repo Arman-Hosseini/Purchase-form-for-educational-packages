@@ -4,8 +4,10 @@
  * Gateway: Pay.ir
  */
 
+$GLOBALS["PayIr_Url"] = "https://pay.ir/pg/";
+
 function payir_send($api, $amount, $redirect, $mobile = null, $factorNumber = null, $description = null) {
-    return payir_curl_post('https://pay.ir/pg/send', [
+    return payir_curl_post($GLOBALS["PayIr_Url"] . 'send', [
         'api'          => $api,
         'amount'       => $amount,
         'redirect'     => $redirect,
@@ -16,7 +18,7 @@ function payir_send($api, $amount, $redirect, $mobile = null, $factorNumber = nu
 }
 
 function payir_verify($api, $token) {
-    return payir_curl_post('https://pay.ir/pg/verify', [
+    return payir_curl_post($GLOBALS["PayIr_Url"] . 'verify', [
         'api' 	=> $api,
         'token' => $token,
     ]);
@@ -33,8 +35,8 @@ function payir_curl_post($url, $params)
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
     ]);
-    $res = curl_exec($ch);
+    $result = curl_exec($ch);
     curl_close($ch);
 
-    return $res;
+    return $result;
 }
